@@ -39,16 +39,22 @@ module Terminal
     end
 
     class History
+      include Terminal::Lock
+
       def initialize
         @records = []
       end
 
       def record(command)
-        @records.push(command)
+        lock do
+          @records.push(command)
+        end
       end
 
       def records
-        @records.dup.freeze
+        lock do
+          @records.dup.freeze
+        end
       end
     end
   end
