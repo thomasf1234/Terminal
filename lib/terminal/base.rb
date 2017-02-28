@@ -13,7 +13,7 @@ module Terminal
       begin
         before_exec(command)
         return_value = sh(command, timeout)
-        exit_status = $?
+        exit_status = last_exit_status
         raise exit_status.inspect unless exit_status.exitstatus == EXIT_STATUS_SUCCESS
         return_value
       ensure
@@ -29,6 +29,12 @@ module Terminal
       history.last
     end
 
+    def ssh(username, host, port, command, options={})
+      options = { 'StrictHostKeyChecking' => 'no', 'NumberOfPasswordPrompts' => 0, 'Port' => port }.merge(options)
+      formatted_options = options.map {|name,value| "-o #{name}=\"#{value}\"" }
+      exec("ssh #{formatted_options.join(' ')} #{username}@#{host} <<EOF\n#{command}\nEOF")
+    end
+
     protected
     def before_exec(command)
       #this hook is called prior to executing a command line call
@@ -38,6 +44,10 @@ module Terminal
       Timeout::timeout(timeout) do
         `#{command}`
       end
+    end
+
+    def last_exit_status
+      $?
     end
 
     class History
