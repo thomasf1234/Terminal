@@ -1,12 +1,26 @@
 require 'spec_helper'
 
 module BaseSpec
+  class TestTerminal < Terminal::Base
+    attr_reader :log
+
+    def initialize
+      super
+      @log = []
+    end
+
+    def before_exec(command)
+      @log << Terminal::Base::History::Record.new(command)
+      sleep 1
+    end
+  end
+
   describe Terminal::Base do
-    let(:base) { Terminal::Base.new }
+    let(:test_terminal) { TestTerminal.new }
 
     describe "#initialize" do
       it 'sets default instance variables' do
-        expect(base.history).to eq([])
+        expect(test_terminal.history).to eq([])
       end
     end
 
@@ -20,23 +34,36 @@ module BaseSpec
       end
 
       it 'executes the command with correct hooks and appends to history' do
-        expect(base).to receive(:before_exec).with(commands[0]).ordered
-        expect(base).to receive(:sh).with(commands[0], 1800).ordered
-        base.exec("false")
-        expect(base).to receive(:before_exec).with(commands[1]).ordered
-        expect(base).to receive(:sh).with(commands[1], 1800).ordered
-        base.exec("echo command2")
-        expect(base).to receive(:before_exec).with(commands[2]).ordered
-        expect(base).to receive(:sh).with(commands[2], 1800).ordered
-        base.exec("echo command3")
+        expect { test_terminal.exec("false") }.to raise_exception(RuntimeError, /exit 1/)
+        sleep 2
+        expect(test_terminal.last_command.recorded_at > test_terminal.log.last.recorded_at)
 
-        expect(base.history).to eq(commands)
+        test_terminal.exec("echo command2")
+        sleep 2
+        expect(test_terminal.last_command.recorded_at > test_terminal.log.last.recorded_at)
+
+        test_terminal.exec("echo command3")
+        expect(test_terminal.last_command.recorded_at > test_terminal.log.last.recorded_at)
+
+
+        expect(test_terminal.log.count).to eq(3)
+        expect(test_terminal.history.count).to eq(3)
+        expect(test_terminal.history.sort_by(&:recorded_at).map(&:command)).to eq(commands)
       end
 
       context "unknown command" do
         it 'raises a RuntimeError and appends to history' do
-          expect { base.exec("unknown command") }.to raise_exception
-          expect(base.history).to eq(["unknown command"])
+          expect { test_terminal.exec("unknown command") }.to raise_exception
+          expect(test_terminal.history.count).to eq(1)
+          expect(test_terminal.history.first.command).to eq("unknown command")
+        end
+      end
+
+      context "non-zero exit status" do
+        it 'raises a RuntimeError and appends to history' do
+          expect { test_terminal.exec("false") }.to raise_exception(RuntimeError, /exit 1/)
+          expect(test_terminal.history.count).to eq(1)
+          expect(test_terminal.history.first.command).to eq("false")
         end
       end
 
@@ -44,8 +71,9 @@ module BaseSpec
         let(:timeout) { 1 }
 
         it "raises Timeout::Error" do
-          expect { base.exec("sleep 5", timeout) }.to raise_error(Timeout::Error)
-          expect(base.history).to eq(["sleep 5"])
+          expect { test_terminal.exec("sleep 5", timeout) }.to raise_error(Timeout::Error)
+          expect(test_terminal.history.count).to eq(1)
+          expect(test_terminal.history.first.command).to eq("sleep 5")
         end
       end
     end
