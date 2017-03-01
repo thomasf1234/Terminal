@@ -113,6 +113,37 @@ module BaseSpec
         end
       end
     end
+
+    describe '#scp' do
+      before :each do
+        allow(test_terminal).to receive(:sh).and_return(true)
+        allow(test_terminal).to receive(:last_exit_status).and_return(double(Process::Status, exitstatus: 0))
+      end
+
+      it 'executes the correct ssh command' do
+        test_terminal.scp('abstractx1', '127.0.0.1', 22, 'tmp/source_file', '/opt/dir/source_file')
+        test_terminal.scp('abstractx1', '127.0.0.1', 22, 'tmp/source_file', '/opt/dir/source_file', true)
+        test_terminal.scp('abstractx1', '127.0.0.1', 30, 'tmp/source_file', '/opt/dir/source_file', false)
+        test_terminal.scp('abstractx1', '127.0.0.1', 30, 'tmp/source_file', '/opt/dir/source_file', true, {'IdentityFile' => "/home/myuser/.ssh/id_rsa_another"})
+
+        expected_history = ["scp -o StrictHostKeyChecking=\"no\" -o NumberOfPasswordPrompts=\"0\" -o Port=\"22\" tmp/source_file abstractx1@127.0.0.1:/opt/dir/source_file",
+                            "scp -o StrictHostKeyChecking=\"no\" -o NumberOfPasswordPrompts=\"0\" -o Port=\"22\" tmp/source_file abstractx1@127.0.0.1:/opt/dir/source_file",
+                            "scp -o StrictHostKeyChecking=\"no\" -o NumberOfPasswordPrompts=\"0\" -o Port=\"30\" abstractx1@127.0.0.1:tmp/source_file /opt/dir/source_file",
+                            "scp -o StrictHostKeyChecking=\"no\" -o NumberOfPasswordPrompts=\"0\" -o Port=\"30\" -o IdentityFile=\"/home/myuser/.ssh/id_rsa_another\" tmp/source_file abstractx1@127.0.0.1:/opt/dir/source_file"]
+
+        expect(test_terminal.history.map(&:command)).to eq(expected_history)
+      end
+
+      context 'exception' do
+        before :each do
+          allow(test_terminal).to receive(:exec).and_raise("Oops!")
+        end
+
+        it 'raises the error' do
+          expect { test_terminal.scp('abstractx1', '127.0.0.1', 22, 'tmp/source_file', '/opt/dir/source_file') }.to raise_exception("Oops!")
+        end
+      end
+    end
   end
 end
 

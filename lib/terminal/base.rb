@@ -31,8 +31,17 @@ module Terminal
 
     def ssh(username, host, port, command, options={})
       options = { 'StrictHostKeyChecking' => 'no', 'NumberOfPasswordPrompts' => 0, 'Port' => port }.merge(options)
-      formatted_options = options.map {|name,value| "-o #{name}=\"#{value}\"" }
-      exec("ssh #{formatted_options.join(' ')} #{username}@#{host} <<EOF\n#{command}\nEOF")
+      exec("ssh #{format_options(options)} #{username}@#{host} <<EOF\n#{command}\nEOF")
+    end
+
+    def scp(username, host, port, source, destination, to_remote=true, options={})
+      options = { 'StrictHostKeyChecking' => 'no', 'NumberOfPasswordPrompts' => 0, 'Port' => port }.merge(options)
+
+      if to_remote == true
+        exec("scp #{format_options(options)} #{source} #{username}@#{host}:#{destination}")
+      else
+        exec("scp #{format_options(options)} #{username}@#{host}:#{source} #{destination}")
+      end
     end
 
     protected
@@ -48,6 +57,10 @@ module Terminal
 
     def last_exit_status
       $?
+    end
+
+    def format_options(hash)
+      hash.map {|name,value| "-o #{name}=\"#{value}\"" }.join(' ')
     end
 
     class History
